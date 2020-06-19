@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  # sensor:
+  #   image: powerapi/hwpc-sensor
+  #   container_name: sensor
+  #   volumes:
+  #     - /tmp/powerapi-sensor-reporting:/reporting
+  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  #     - /sys:/sys
+  #   command: -n sensor_test -c hwpc -e LLC_MISSES -e CYCLES -c rapl -e RAPL_ENERGY_PKG -r mongodb -U "mongodb://mongodb" -D powerapi -C sensor2
+  mongodb:
+    image: mongo
+    container_name: mongodb
+    volumes:
+      - /tmp/mongo-volume:/data/db
+    ports:
+      - "27017-27019:27017-27019"
+    # stdin_open: true
+    # tty: true
+  formula:
+    image: powerapi/rapl-formula
+    container_name: formula-rapl
+    depends_on:
+      - mongodb
+    command: -s --input mongodb -u "mongodb://mongodb" -d powerapi -c sensor2 --output influxdb --uri influxdb --port 8086 --db telegraf
+  influxdb:
+    restart: always
+    image: influxdb
+    container_name: influxdb
+    volumes:
+      - /tmp/influx-volume:/var/lib/influxdb
+    environment:
+      INFLUXDB_DB: telegraf
+      # INFLUXDB_ADMIN_ENABLED: 1
+      # INFLUXDB_ADMIN_USER: admin
+      # INFLUXDB_ADMIN_PASSWORD: supersecretpassword
+      INFLUXDB_USER: telegraf
+      INFLUXDB_USER_PASSWORD: secretpassword
+      # INFLUXDB_HTTP_AUTH_ENABLED: 1
+    # run: /init-influxdb.sh
+    ports:
+      - 8083:8083
+      - 8086:8086
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    depends_on:
+      - influxdb
+    volumes:
+      - ./grafana/grafana-volume:/var/lib/grafana
+      - ./grafana/grafana-provisioning:/etc/grafana/provisioning
+    ports:
+      - 3000:3000
+  
+
+      
